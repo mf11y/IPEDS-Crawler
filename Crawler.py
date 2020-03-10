@@ -52,22 +52,23 @@ class IPEDSSpider(scrapy.Spider):
         htm = response.selector.xpath('//table[@id="contentPlaceHolder_tblResult"]/tr').getall()
         infodict = dict()
         for row in htm:
-            year = str(Selector(text=row).xpath('//td[1]/text()').get())
-            survey = str(Selector(text=row).xpath('//td[2]/text()').get())
-            title = str(Selector(text=row).xpath('//td[3]/text()').get())
-            stata_link = str(Selector(text=row).xpath('//td[5]/a/@href').get())
-            stata_program_link = str(Selector(text=row).xpath('//td[6]/a[3]/@href').get())
-            dictionary = str(Selector(text=row).xpath('//td[7]/a/@href').get())
-            entry = [title, stata_link, stata_program_link, dictionary]
+            year = str(Selector(text=row).xpath('//td[1]/text()').get()).strip()
+            survey = str(Selector(text=row).xpath('//td[2]/text()').get()).strip()
+            title = str(Selector(text=row).xpath('//td[3]/text()').get()).strip()
+            stata_link = str(Selector(text=row).xpath('//td[5]/a/@href').get()).strip()
+            stata_program_link = str(Selector(text=row).xpath('//td[6]/a[3]/@href').get()).strip()
+            dictionary = str(Selector(text=row).xpath('//td[7]/a/@href').get()).strip()
+            entry = [stata_link, stata_program_link, dictionary]
 
             if year != "None":
+
                 if survey in infodict:
-                    if year in infodict[survey]:
-                        infodict[survey][year] = infodict[survey][year] + entry
+                    if title in infodict[survey]:
+                        infodict[survey][title][year] = entry
                     else:
-                        infodict[survey][year] = entry
+                        infodict[survey][title] = {year: entry}
                 else:
-                    infodict[survey] = {year: entry}
+                    infodict[survey] = {title: {year: entry}}
 
         print(infodict)
         y = json.dumps(infodict)
