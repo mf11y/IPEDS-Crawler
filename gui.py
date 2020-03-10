@@ -1,31 +1,16 @@
 import json
-import os
-import urllib.request
 
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
-
-IPEDSURL = "https://nces.ed.gov/datacenter/"
-
-'''
-class Worker(QObject):
-    def __init__(self, signal_to_emit, parent=None):
-        super().__init__(parent)
-        self.signal_to_emit = signal_to_emit
-
-'''
 
 
 class MainWindow(QMainWindow):
 
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
-        self.setGeometry(500, 500, 600, 500)
+        self.setGeometry(500, 500, 250, 0)
         self.layout = QVBoxLayout()
-
-        self.cwd = os.getcwd()
-        print(self.cwd)
 
         self.jsondata = {}
 
@@ -34,8 +19,14 @@ class MainWindow(QMainWindow):
         self.surveylabel = QLabel()
         self.surveys = QComboBox()
 
+        self.startyear = QComboBox()
+        self.startlabel = QLabel()
+
+        self.endyear = QComboBox()
+        self.endlabel = QLabel()
+
         self.titlelabel = QLabel()
-        self.title = QListWidget()
+        self.title = QComboBox()
 
         self.download = QPushButton()
 
@@ -48,48 +39,34 @@ class MainWindow(QMainWindow):
 
         self.show()
 
-    def selectedSurvey(self):
-        self.populateTitle()
+    def selectedsurvey(self, selected):
+        print(self.surveys.currentText())
+        self.initStartYear()
 
-    def populateTitle(self):
-        self.title.clear()
-        print('hello')
+    def initStartYear(self):
+        self.startyear.clear()
+        self.endyear.clear()
 
-        currentdict = self.jsondata[self.surveys.currentText()]
-        yearlist = []
-        orderlist = []
+        for item in self.jsondata[self.surveys.currentText()]:
+            self.startyear.addItem(item)
 
-        for item in currentdict:
-            yearlist.clear()
-            print(item)
+    def selectedstartyear(self, selected):
+        self.endyear.clear()
+        for item in self.jsondata[self.surveys.currentText()]:
+            if int(item) >= int(self.startyear.currentText()):
+                self.endyear.addItem(item)
 
-            for y in currentdict[item]:
-                yearlist.append(y)
+    def selectedendyear(self):
 
-            orderlist.append(item + '      [ ' + min(yearlist) + ' - ' + max(yearlist) +' ] ')
+        years = []
 
-        orderlist.sort()
+        for i in range(0, self.endyear.count()):
+            if self.endyear.itemText(i) <= self.endyear.currentText():
+                years.append(str(self.endyear.itemText(i)))
 
-        for item in orderlist:
-            self.title.addItem(item)
-
-    def selectedTitle(self):
-        self.activatedownload()
-
-
-    def activatedownload(self):
-        self.download.setEnabled(True)
-
-    def createDirs(self):
-        if not os.path.exists(self.surveys.currentText()):
-            os.makedirs(self.surveys.currentText() + '\\' + self.surveys.currentText() + ' Extracted Stata Data Files' +
-                        '\\' + self.surveys.currentText() + ' Original Zipped Stata Data')
-            os.makedirs(
-                self.surveys.currentText() + '\\' + self.surveys.currentText() + ' Extracted Stata Program Files'
-                + '\\' + self.surveys.currentText() + ' Original Zipped Stata Program Files')
-            os.makedirs(self.surveys.currentText() + '\\' + self.surveys.currentText() +
-                        ' Extracted Dictionary Data Files' + '\\' + self.surveys.currentText()
-                        + ' Original Zipped Dictionary Data Files')
+        print (years)
+        for x in years:
+            print(self.jsondata[self.surveys.currentText()][x])
 
     def crawl(self):
         self.retrievebutton.setText("Please Wait")
@@ -102,14 +79,15 @@ class MainWindow(QMainWindow):
 
     def retrieveJSON(self, exitCode, exitStatus):
         with open('ipeds.json', 'r') as fp:
-            self.jsondata = json.load(fp)
+            self.jsondata = json.loads(fp.read())
 
         self.setWidgets()
 
     def setWidgets(self):
         self.retrievebutton.setText("Links retrieved")
+        self.startyear.setEnabled(True)
+        self.endyear.setEnabled(True)
         self.surveys.setEnabled(True)
-        self.title.setEnabled(True)
         for item in self.jsondata:
             self.surveys.addItem(item)
 
@@ -119,14 +97,20 @@ class MainWindow(QMainWindow):
         self.retrievebutton.pressed.connect(self.crawl)
 
         self.surveylabel.setText('Survey')
-        self.surveys.activated.connect(self.selectedSurvey)
+        self.surveys.activated.connect(self.selectedsurvey)
+
+        self.startlabel.setText('Start year')
+        self.startyear.activated.connect(self.selectedstartyear)
+
+        self.endlabel.setText('End year')
+        self.endyear.activated.connect(self.selectedendyear)
 
         self.titlelabel.setText('Title')
-        self.title.activated.connect(self.selectedTitle)
 
         self.download.setText('Download Files')
-        self.download.pressed.connect(self.createDirs)
 
+        self.startyear.setEnabled(False)
+        self.endyear.setEnabled(False)
         self.surveys.setEnabled(False)
         self.title.setEnabled(False)
         self.download.setEnabled(False)
@@ -134,6 +118,10 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.retrievebutton)
         self.layout.addWidget(self.surveylabel)
         self.layout.addWidget(self.surveys)
+        self.layout.addWidget(self.startlabel)
+        self.layout.addWidget(self.startyear)
+        self.layout.addWidget(self.endlabel)
+        self.layout.addWidget(self.endyear)
         self.layout.addWidget(self.titlelabel)
         self.layout.addWidget(self.title)
         self.layout.addWidget(self.download)
