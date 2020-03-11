@@ -8,35 +8,54 @@ from PyQt5.QtCore import *
 
 IPEDSURL = "https://nces.ed.gov/datacenter/"
 
-'''
-class Worker(QObject):
-    def __init__(self, signal_to_emit, parent=None):
-        super().__init__(parent)
-        self.signal_to_emit = signal_to_emit
-'''
 
+class Worker(QObject):
+
+    filesToDL = pyqtSignal(dict)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.filesToDL.connect(self.download_files)
+
+    @pyqtSlot(dict)
+    def download_files(self, files):
+        import time
+        time.sleep(5)
+        print(files)
 
 class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        screen = app.primaryScreen()
+        size = screen.size()
+        self.setGeometry(30, 30, size.width()/2, size.height() - 100)
 
-    def __init__(self, *args, **kwargs):
-        super(MainWindow, self).__init__(*args, **kwargs)
-        self.setGeometry(500, 500, 600, 500)
         self.layout = QVBoxLayout()
 
-        self.cwd = os.getcwd()
-        print(self.cwd)
-
         self.jsondata = {}
-
-        self.retrievebutton = QPushButton()
+        self.filesToDL = []
 
         self.surveylabel = QLabel()
         self.surveys = QComboBox()
+
+        self.filterlabel = QLabel()
+        self.filterEdit = QLineEdit()
+
+        self.filterbutton = QPushButton()
 
         self.titlelabel = QLabel()
         self.title = QListWidget()
 
         self.download = QPushButton()
+
+        self.worker = Worker()
+        thread = QThread(self)
+        thread.start()
+
+        self.worker.moveToThread(thread)
+
+        self.dirNameLabel = QLabel()
+        self.dirName = QLineEdit()
 
         self.initUI()
 
@@ -47,48 +66,57 @@ class MainWindow(QMainWindow):
 
         self.show()
 
-    def selectedSurvey(self):
-        self.populateTitle()
+    def activateDirName(self):
+        self.dirName.setEnabled(True)
 
-    def populateTitle(self):
+    def activateDLButton(self):
+        self.download.setEnabled(True)
+
+    def filter(self):
         self.title.clear()
-        print('hello')
+
+        if not str(self.filterEdit.text()).isdigit():
+            self.filterEdit.setText('1980')
 
         currentdict = self.jsondata[self.surveys.currentText()]
-        yearlist = []
         orderlist = []
 
         for item in currentdict:
-            yearlist.clear()
-            print(item)
-
             for y in currentdict[item]:
-                yearlist.append(y)
-
-            orderlist.append(item + '      [ ' + min(yearlist) + ' - ' + max(yearlist) +' ] ')
+                if y >= self.filterEdit.text():
+                    orderlist.append(item + ' | ' + y)
 
         orderlist.sort()
 
         for item in orderlist:
             self.title.addItem(item)
 
-    def selectedTitle(self):
-        self.activatedownload()
 
+    def readyFiles(self):
 
-    def activatedownload(self):
-        self.download.setEnabled(True)
-
-    def createDirs(self):
         if not os.path.exists(self.surveys.currentText()):
-            os.makedirs(self.surveys.currentText() + '\\' + self.surveys.currentText() + ' Extracted Stata Data Files' +
-                        '\\' + self.surveys.currentText() + ' Original Zipped Stata Data')
-            os.makedirs(
-                self.surveys.currentText() + '\\' + self.surveys.currentText() + ' Extracted Stata Program Files'
-                + '\\' + self.surveys.currentText() + ' Original Zipped Stata Program Files')
-            os.makedirs(self.surveys.currentText() + '\\' + self.surveys.currentText() +
-                        ' Extracted Dictionary Data Files' + '\\' + self.surveys.currentText()
-                        + ' Original Zipped Dictionary Data Files')
+            dirName = self.dirName.text()
+            surveyName = self.surveys.currentText()
+
+            os.makedirs(surveyName + '\\' + dirName + ' Extracted Stata Data Files' + '\\' + dirName +
+                        ' Original Zipped Stata Data')
+            os.makedirs(surveyName + '\\' + dirName + ' Extracted Stata Program Files'+ '\\' + dirName +
+                        ' Original Zipped Stata Program Files')
+            os.makedirs(surveyName + '\\' + dirName + ' Extracted Dictionary Data Files' + '\\' + dirName +
+                        ' Original Zipped Dictionary Data Files')
+
+        self.filesToDL.clear()
+        survey = self.surveys.currentText()
+
+
+
+        for x in range(len(self.title.selectedItems())):
+            title = self.title.selectedItems()[x].text().split('|')[0].strip()
+            year = self.title.selectedItems()[x].text().split('|')[1].strip()
+            self.filesToDL = self.filesToDL + [self.jsondata[survey][title][year]]
+
+        self.worker.filesToDL.emit(self.filesToDL)
+
 
     def crawl(self):
         self.retrievebutton.setText("Please Wait")
@@ -109,32 +137,56 @@ class MainWindow(QMainWindow):
         self.retrievebutton.setText("Links retrieved")
         self.surveys.setEnabled(True)
         self.title.setEnabled(True)
+        self.filterEdit.setEnabled(True)
+        self.filterbutton.setEnabled(True)
         for item in self.jsondata:
             self.surveys.addItem(item)
 
     def initUI(self):
 
+        self.retrievebutton = QPushButton()
         self.retrievebutton.setText("Retrieve Links")
         self.retrievebutton.pressed.connect(self.crawl)
 
         self.surveylabel.setText('Survey')
-        self.surveys.activated.connect(self.selectedSurvey)
+
+        self.filterlabel.setText('Filter (Show only entries >= date)')
+
+        self.filterEdit.setText('1980')
+        self.filterEdit.returnPressed.connect(self.filter)
+
+        self.filterbutton.setText('Filter')
+        self.filterbutton.pressed.connect(self.filter)
 
         self.titlelabel.setText('Title')
-        self.title.activated.connect(self.selectedTitle)
+        self.title.setFont(QFont('Arial', 10))
+        self.title.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        self.title.itemClicked.connect(self.activateDirName)
+
+        self.dirNameLabel.setText('Directory Names')
+        self.dirName.setText('DirName')
+        self.dirName.textEdited.connect(self.activateDLButton)
 
         self.download.setText('Download Files')
-        self.download.pressed.connect(self.createDirs)
+        self.download.clicked.connect(self.readyFiles)
 
         self.surveys.setEnabled(False)
         self.title.setEnabled(False)
         self.download.setEnabled(False)
+        self.filterEdit.setEnabled(False)
+        self.filterbutton.setEnabled(False)
+        self.dirName.setEnabled(False)
 
         self.layout.addWidget(self.retrievebutton)
         self.layout.addWidget(self.surveylabel)
         self.layout.addWidget(self.surveys)
+        self.layout.addWidget(self.filterlabel)
+        self.layout.addWidget(self.filterEdit)
+        self.layout.addWidget(self.filterbutton)
         self.layout.addWidget(self.titlelabel)
         self.layout.addWidget(self.title)
+        self.layout.addWidget(self.dirNameLabel)
+        self.layout.addWidget(self.dirName)
         self.layout.addWidget(self.download)
 
 
