@@ -64,11 +64,14 @@ class IPEDSSpider(scrapy.Spider):
 
                 if survey in infodict:
                     if title in infodict[survey]:
-                        infodict[survey][title][year] = entry
+                        infodict[survey][title][year] = {'stata_link': stata_link, 'stata_program_link':stata_program_link,
+                                                       'dictionary': dictionary}
                     else:
-                        infodict[survey][title] = {year: entry}
+                        infodict[survey][title] = {year: {'stata_link': stata_link, 'stata_program_link':stata_program_link,
+                                                       'dictionary': dictionary}}
                 else:
-                    infodict[survey] = {title: {year: entry}}
+                    infodict[survey] = {title: {year: {'stata_link': stata_link, 'stata_program_link':stata_program_link,
+                                                       'dictionary': dictionary}}}
 
         print(infodict)
         y = json.dumps(infodict)
